@@ -10,7 +10,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 #external libraries to be used in the project
 include_directories(include/external)
 
-
 #local directories
 include_directories(noise)
 include_directories(include/io)

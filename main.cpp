@@ -7,12 +7,14 @@
 
 #include "include/graphics/shaders.h"
 
+#include "noise/perlin.h"
+
 //globals
-int WIDTH = 1080;
-int HEIGHT = 720;
+int WIDTH = 800;
+int HEIGHT = 800;
 
 //set camera position
-glm::vec3 cameraPosition = glm::vec3(0.0f, 3.0f, 0.0f);
+glm::vec3 cameraPosition = glm::vec3(0.0f, 1.0f, 0.0f);
 Camera ourCamera(cameraPosition);   //defines the initial viewing position
 
 //define model factors
@@ -27,8 +29,6 @@ void screenResizeCallback(GLFWwindow* window, int width, int height);
 //helps in calculation of delta time, to determine change in mouse position, fps
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-
-
 
 int main(){
 
@@ -50,20 +50,6 @@ int main(){
 
     glfwMakeContextCurrent(window);
 
-    //load opengl library
-    if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
-
-        std::cerr<<"Failed to load opengl.";
-        return -1;
-    }
-
-    //give opengl the window context
-    glViewport(0, 0, WIDTH, HEIGHT);
-    glClearColor(0.0f, 0.7098f, 0.8862f, 1.0f);
-
-    //enable depth test to correctly render the faces of distant and near objects
-    glEnable(GL_DEPTH_TEST);
-
     //configure callbacks
     glfwSetFramebufferSizeCallback(window, screenResizeCallback);
     glfwSetKeyCallback(window, Keyboard::keyCallback);
@@ -71,7 +57,22 @@ int main(){
     glfwSetScrollCallback(window, Mouse::mouseWheelCallBack);
 
     //disable mouse
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    //load opengl library
+    if(!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
+
+        std::cerr<<"Failed to load opengl.";
+        return -1;
+    }
+
+    //enable depth test to correctly render the faces of distant and near objects
+    glEnable(GL_DEPTH_TEST);
+
+    //give opengl the window context
+    glViewport(0, 0, WIDTH, HEIGHT);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
 
     //-----------------------------------------------------------------------------//
 
@@ -79,13 +80,10 @@ int main(){
     //file position relative to the binary / executable
     Shader ourShader("../resources/vertexShader.vs", "../resources/fragmentShader.fs");
     
-
-    //--------------------------------------------------------------------//
-
     //configure terrain properties
     const int PLANE_WIDTH = 1000;
     const int PLANE_HEIGHT = 1000; 
-    const int PLANE_RESOLUTION = 9;  //the resolution of output triangles
+    const int PLANE_RESOLUTION = 3;  //the resolution of output triangles
 
     //we will render the plane in stripes so
     const int TOTAL_NUM_STRIPES = (PLANE_HEIGHT - 1) / PLANE_RESOLUTION;
@@ -97,13 +95,16 @@ int main(){
     //the indices for our terrain it determines the way the terrain is rendered
     std::vector<unsigned int> indices;
 
+    //height value from the noise function
+    Noise::Perlin ourNoise = Noise::Perlin();
+
     //populate the vertices
     for( int i = 0; i < PLANE_HEIGHT; i++ ){
 
         for( int j = 0; j < PLANE_WIDTH; j++ ){
 
             vertices.push_back(i);  //x-coord of our vertices in plain
-            vertices.push_back(0); //height of vertices in plain
+            vertices.push_back(ourNoise.genHeight(i, j)); //height of vertices in plain
             vertices.push_back(j); //z-coord of our vertices in plain
         }
     }
@@ -148,8 +149,8 @@ int main(){
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STATIC_DRAW);
 
     //make sense of data sent
-    glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
+    glEnableVertexAttribArray(0);
 
     //send ebo too
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -167,10 +168,13 @@ int main(){
         lastFrame = currentTime;
 
         processInput(deltaTime, window);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         //bind vao and use shaders
-        glBindVertexArray(VAO);
         ourShader.useShader();
+        glBindVertexArray(VAO);
+
 
         //set our transformations
         view = ourCamera.getViewMatrix();
@@ -193,7 +197,7 @@ int main(){
         }
 
         //clear the buffer bits
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
@@ -222,7 +226,6 @@ void processInput(double dt, GLFWwindow* window){
         glfwSetWindowShouldClose(window, true);
     }
 
-    
     //move camera with keys
     if( Keyboard::key(GLFW_KEY_W)){
         ourCamera.updateCameraPos(cameraMovement::FORWARD, dt);
